@@ -4,7 +4,6 @@ using Aptos.Unity.Rest.Model;
 using Chaos.NaCl;
 using NBitcoin;
 using Newtonsoft.Json;
-using Org.BouncyCastle.Cms;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -41,25 +40,19 @@ namespace Aptos.Unity.Rest
 
         /// Based enpoint for REST API.
         public Uri Endpoint { get; private set; }
-        public int ChainId { get; private set; }
+        public int? ChainId { get; private set; }
 
         private void Awake()
         {
             if (Instance != null && Instance != this)
-            {
                 Destroy(this);
-            }
             else
-            {
                 Instance = this;
-            }
         }
 
         #region Setup
-        public IEnumerator SetUp(Action<RestClient> Callback, string BaseUrl)
+        public IEnumerator SetUp()
         {
-            this.Endpoint = new Uri(BaseUrl);
-
             LedgerInfo ledgerInfo = new LedgerInfo();
             ResponseInfo responseInfo = new ResponseInfo();
             Coroutine ledgerInfoCor = StartCoroutine(
@@ -79,17 +72,16 @@ namespace Aptos.Unity.Rest
             }
 
             this.ChainId = ledgerInfo.ChainId;
-
-            Callback(Instance);
         }
 
         /// <summary>
         /// Set Endpoint for RPC / REST call.
         /// </summary>
         /// <param name="url">Base URL for REST API.</param>
-        public void SetEndPoint(string url)
+        public RestClient SetEndPoint(string url)
         {
             Endpoint = new Uri(url);
+            return this;
         }
         #endregion
 
@@ -314,7 +306,13 @@ namespace Aptos.Unity.Rest
             request.Dispose();
         }
 
-        // TODO: Explore and add documentation
+        /// <summary>
+        /// Get resources (in a JSON format) from a given account.
+        /// </summary>
+        /// <param name="callback">allback function used when response is received.</param>
+        /// <param name="accountAddress">Address of the account.</param>
+        /// <param name="ledgerVersion">Type of resource being queried for.</param>
+        /// <returns></returns>
         public IEnumerator GetAccountResources(Action<bool, long, string> callback, Accounts.AccountAddress accountAddress, string ledgerVersion = "")
         {
             string accountsURL = Endpoint + "/accounts/" + accountAddress.ToString() + "/resources";
@@ -693,7 +691,14 @@ namespace Aptos.Unity.Rest
         }
 
 
-        // TODO: Implement AggregatorValue
+        /// <summary>
+        /// Aggregates the values from a resource query.
+        /// </summary>
+        /// <param name="Callback"></param>
+        /// <param name="AccountAddress"></param>
+        /// <param name="ResourceType"></param>
+        /// <param name="AggregatorPath"></param>
+        /// <returns></returns>
         public IEnumerator AggregatorValue(
             Action<string, ResponseInfo> Callback,
             AccountAddress AccountAddress,
@@ -701,7 +706,7 @@ namespace Aptos.Unity.Rest
             List<string> AggregatorPath
         )
         {
-            yield return null;
+            throw new NotImplementedException();
         }
 
         #endregion
@@ -752,24 +757,18 @@ namespace Aptos.Unity.Rest
         #endregion
 
         #region Transactions
-        // TODO: Test SimuateTransaction
         public IEnumerator SimulateTransaction(
             Action<string, ResponseInfo> callback,
             RawTransaction transaction,
             Account sender
         )
         {
-            // authenticator = Authenticator(
-            //      Ed25519Authenticator(
-            //          sender.public_key(),
-            //          ed25519.Signature(b"\x00" * 64),
-            //      )
-            // )
-
+            byte[] emptySignature = new byte[64]; // all 0's
             Authenticator authenticator = new Authenticator(
                 new Ed25519Authenticator(
                     sender.PublicKey,
-                    new Signature(new byte[64]) // TODO: Check if this generates a byte array 64 lenght with padded 0's
+                    new Signature(emptySignature)
+
                 )
             );
 
@@ -779,8 +778,6 @@ namespace Aptos.Unity.Rest
             UnityWebRequest request = new UnityWebRequest(simulateTxnEndpoint, "POST");
             request.SetRequestHeader("Content-Type", "application/x.aptos.signed_transaction+bcs");
 
-            // byte[] jsonToSend = new UTF8Encoding().GetBytes(tableItemRequestJson);
-            // request.uploadHandler = new UploadHandlerRaw(jsonToSend);
             request.uploadHandler = new UploadHandlerRaw(signedTransaction.Bytes());
             request.downloadHandler = new DownloadHandlerBuffer();
 
@@ -817,7 +814,12 @@ namespace Aptos.Unity.Rest
 
         }
 
-        // TODO: Check JSON object returned by Submit BCS Transaction, and update return type
+        /// <summary>
+        /// Submits a BCS transaction.
+        /// </summary>
+        /// <param name="callback">Callback function used after response is received with the JSON response.</param>
+        /// <param name="SignedTransaction">The signed transaction.</param>
+        /// <returns></returns>
         public IEnumerator SubmitBCSTransaction(
             Action<string, ResponseInfo> callback,
             SignedTransaction SignedTransaction
@@ -936,7 +938,7 @@ namespace Aptos.Unity.Rest
         /// <returns>Calls <c>callback</c>function with <c>(Transaction, ResponseInfo)</c>:\n
         /// An object that represents the transaction submitted - null if the transaction fails, and a response object with the response detials.
         /// </returns>
-        public IEnumerator SubmitTransaction(Action<Transaction, ResponseInfo> callback, Account sender, Model.TransactionPayload payload)
+        public IEnumerator SubmitTransaction(Action<Transaction, ResponseInfo> callback, Account sender, EntryFunction entryFunction)
         {
             ///////////////////////////////////////////////////////////////////////
             // 1) Generate a transaction request
@@ -963,7 +965,7 @@ namespace Aptos.Unity.Rest
                 MaxGasAmount = Constants.MAX_GAS_AMOUNT.ToString(),
                 GasUnitPrice = Constants.GAS_UNIT_PRICE.ToString(),
                 ExpirationTimestampSecs = expirationTimestamp,
-                Payload = payload
+                EntryFunction = entryFunction
             };
 
             var txnRequestJson = JsonConvert.SerializeObject(txnRequest, new TransactionRequestConverter());
@@ -997,7 +999,7 @@ namespace Aptos.Unity.Rest
             string transactionURL = Endpoint + "/transactions";
             Uri transactionsURI = new Uri(transactionURL);
             var request = RequestClient.SubmitRequest(transactionsURI, UnityWebRequest.kHttpVerbPOST);
-            
+
             byte[] jsonToSend = new UTF8Encoding().GetBytes(txnRequestJson);
             request.uploadHandler = new UploadHandlerRaw(jsonToSend);
             request.downloadHandler = new DownloadHandlerBuffer();
@@ -1233,7 +1235,6 @@ namespace Aptos.Unity.Rest
 
         #region Transaction Helpers
 
-        // TODO: Update all TransactionPayload instantiations to use BCS.TransactionPayload
         public IEnumerable CreateMultiAgentBCSTransaction(Action<SignedTransaction> Callback, Account Sender, List<Account> SecondaryAccounts, BCS.TransactionPayload Payload)
         {
             string sequenceNumber = "";
@@ -1254,6 +1255,12 @@ namespace Aptos.Unity.Rest
             foreach (Account account in SecondaryAccounts)
                 secondaryAddressList.Add(account.AccountAddress);
 
+            if(ChainId == null) // If ChainId is null, the set up the REST Client, get the chain ID.
+            {
+                Coroutine restClientSetupCor = StartCoroutine(this.SetUp());
+                yield return restClientSetupCor;
+            }
+
             ulong expirationTimestamp = ((ulong)(DateTime.Now.ToUnixTimestamp() + Constants.EXPIRATION_TTL));
 
             MultiAgentRawTransaction rawTransaction = new MultiAgentRawTransaction(
@@ -1264,7 +1271,7 @@ namespace Aptos.Unity.Rest
                     ClientConfig.MAX_GAS_AMOUNT,
                     ClientConfig.GAS_UNIT_PRICE,
                     expirationTimestamp,
-                    this.ChainId
+                    (int)this.ChainId
                 ),
                 new BCS.Sequence(secondaryAddressList.ToArray())
             );
@@ -1296,7 +1303,6 @@ namespace Aptos.Unity.Rest
             Callback(new SignedTransaction(rawTransaction.Inner(), authenticator));
         }
 
-        // TODO: Fix TransactionPayload declaration
         public IEnumerator CreateBCSTransaction(
             Action<RawTransaction> Callback,
             Account Sender,
@@ -1316,6 +1322,12 @@ namespace Aptos.Unity.Rest
                 throw new Exception("Unable to get sequence number for: " + Sender.AccountAddress + ".\n" + responseInfo.message);
             }
 
+            if (ChainId == null) // If ChainId is null, the set up the REST Client, get the chain ID.
+            {
+                Coroutine restClientSetupCor = StartCoroutine(this.SetUp());
+                yield return restClientSetupCor;
+            }
+
             ulong expirationTimestamp = ((ulong)(DateTime.Now.ToUnixTimestamp() + Constants.EXPIRATION_TTL));
 
             RawTransaction rawTxn = new RawTransaction(
@@ -1325,7 +1337,7 @@ namespace Aptos.Unity.Rest
                 ClientConfig.MAX_GAS_AMOUNT,
                 ClientConfig.GAS_UNIT_PRICE,
                 expirationTimestamp,
-                this.ChainId
+                (int)this.ChainId
             );
 
             Callback(rawTxn);
@@ -1333,7 +1345,6 @@ namespace Aptos.Unity.Rest
             yield return null;
         }
 
-        // TODO: Fix "full qualifying TransactionPayload"
         public IEnumerator CreateBCSSignedTransaction(
             Action<SignedTransaction> Callback,
             Account Sender,
@@ -1383,24 +1394,25 @@ namespace Aptos.Unity.Rest
                 yield break;
             }
 
-            // TODO: Fix - use BCS.TransactionPayload instead of Model.TransactionPayload
-            var transferPayload = new Model.TransactionPayload()
-            {
-                Type = Constants.ENTRY_FUNCTION_PAYLOAD,
-                Function = Constants.COIN_TRANSFER_FUNCTION,
-                TypeArguments = new string[] {},
-                Arguments = new Arguments()
-                {
-                    ArgumentStrings = new string[] { to, amount.ToString() }
-                }
-            };
+            EntryFunction payload = new EntryFunction(
+                new ModuleId(AccountAddress.FromHex("0x1"), "aptos_account"),
+                "transfer",
+                new TagSequence(new ISerializableTag[] { }),
+                new BCS.Sequence(
+                    new ISerializable[]
+                    {
+                        AccountAddress.FromHex(to),
+                        new U64((ulong)amount)
+                    }
+                )
+            );
 
             Transaction submitTxn = new Transaction();
             responseInfo = new ResponseInfo();
             Coroutine cor_response = StartCoroutine(SubmitTransaction((_submitTxn, _responseInfo) => {
                 submitTxn = _submitTxn;
                 responseInfo = _responseInfo;
-            }, sender, transferPayload));
+            }, sender, payload));
             yield return cor_response;
 
             if (responseInfo.status == ResponseInfo.Status.Success)
@@ -1567,133 +1579,41 @@ namespace Aptos.Unity.Rest
         /// </returns>
         public IEnumerator CreateCollection(Action<Transaction, ResponseInfo> callback, Account sender, string collectionName, string collectionDescription, string uri)
         {
-            // STEP 1: Create Transaction Arguments
-            Arguments arguments = new Arguments()
-            {
-                ArgumentStrings = new string[] { collectionName, collectionDescription, uri, "18446744073709551615" },
-                MutateSettings = new bool[] { false, false, false }
-            };
+            EntryFunction payload = EntryFunction.Natural(
+                new ModuleId(AccountAddress.FromHex("0x3"), "token"),
+                "create_collection_script",
+                new TagSequence(new ISerializableTag[] { }),
+                new BCS.Sequence(
+                    new ISerializable[]
+                    {
+                        new BString(collectionName),
+                        new BString(collectionDescription),
+                        new BString(uri),
+                        new U64(18446744073709551615),
+                        new BCS.Sequence(new[] { new Bool(false), new Bool(false), new Bool(false) })
+                    }
+                )
+            );
 
-            // STEP 2: Create Payload Containing Transaction Arguments
-            // TYPE: entry_function_payload
-            // TYPE: script_function_payload
-            // FUNCTION: create_collection_script
-            // TODO: Fix - use BCS.TransactionPayload instead of Model.TransactionPayload
-            Model.TransactionPayload createCollectionPayload = new Model.TransactionPayload()
-            {
-                Type = Constants.ENTRY_FUNCTION_PAYLOAD,
-                Function = Constants.CREATE_COLLECTION_SCRIPT, // Contract Address
-                TypeArguments = new string[] { },
-                Arguments = arguments
-            };
+            BCS.TransactionPayload txnPayload = new BCS.TransactionPayload(payload);
 
-            string payloadJson = JsonConvert.SerializeObject(createCollectionPayload, new TransactionPayloadConverter());
+            SignedTransaction signedTransaction = null;
+            Coroutine cor_createBcsSIgnedTransaction = StartCoroutine(CreateBCSSignedTransaction((_signedTransaction) => {
+                signedTransaction = _signedTransaction;
+            }, sender, new BCS.TransactionPayload(payload)));
+            yield return cor_createBcsSIgnedTransaction;
 
-            ///////////////////////////////////////////////////////////////////////
-            // 1) Generate a transaction request
-            ///////////////////////////////////////////////////////////////////////
-            string sequenceNumber = "";
+            string submitBcsTxnJsonResponse = "";
             ResponseInfo responseInfo = new ResponseInfo();
 
-            Coroutine cor_sequenceNumber = StartCoroutine(GetAccountSequenceNumber((_sequenceNumber, _responseInfo) => {
-                sequenceNumber = _sequenceNumber;
+            Coroutine cor_submitBcsTransaction = StartCoroutine(SubmitBCSTransaction((_responseJson, _responseInfo) => {
+                submitBcsTxnJsonResponse = _responseJson;
                 responseInfo = _responseInfo;
-            }, sender.AccountAddress));
-            yield return cor_sequenceNumber;
+            }, signedTransaction));
+            yield return cor_submitBcsTransaction;
 
-            if (responseInfo.status != ResponseInfo.Status.Success)
-            {
-                callback(null, responseInfo);
-                yield break;
-            }
-
-            var expirationTimestamp = (DateTime.Now.ToUnixTimestamp() + Constants.EXPIRATION_TTL).ToString();
-
-            var txnRequest = new TransactionRequest()
-            {
-                Sender = sender.AccountAddress.ToString(),
-                SequenceNumber = sequenceNumber,
-                MaxGasAmount = Constants.MAX_GAS_AMOUNT.ToString(),
-                GasUnitPrice = Constants.GAS_UNIT_PRICE.ToString(),
-                ExpirationTimestampSecs = expirationTimestamp,
-                Payload = createCollectionPayload
-            };
-
-            string txnRequestJson = JsonConvert.SerializeObject(txnRequest, new TransactionRequestConverter());
-
-            ///////////////////////////////////////////////////////////////////////
-            // 2) Submits raw transaction to get encoded submission
-            ///////////////////////////////////////////////////////////////////////
-            string encodedSubmission = "";
-
-            Coroutine cor_encodedSubmission = StartCoroutine(EncodeSubmission((_encodedSubmission) => {
-                encodedSubmission = _encodedSubmission;
-            }, txnRequestJson));
-            yield return cor_encodedSubmission;
-
-            ///////////////////////////////////////////////////////////////////////
-            // STEP 3: Sign Ttransaction
-            ///////////////////////////////////////////////////////////////////////
-            byte[] toSign = StringToByteArray(encodedSubmission.Trim('"')[2..]);
-            Signature signature = sender.Sign(toSign);
-
-            txnRequest.Signature = new SignatureData()
-            {
-                Type = "ed25519_signature",
-                PublicKey = "0x" + CryptoBytes.ToHexStringLower(sender.PublicKey), // Works ..
-                Signature = signature.ToString()
-            };
-
-            ///////////////////////////////////////////////////////////////////////
-            // STEP 4: Submit Transaction
-            ///////////////////////////////////////////////////////////////////////
-            txnRequestJson = JsonConvert.SerializeObject(txnRequest, new TransactionRequestConverter());
-            txnRequestJson = txnRequestJson.Trim();
-
-            string transactionURL = Endpoint + "/transactions";
-            Uri transactionsURI = new Uri(transactionURL);
-            var request = RequestClient.SubmitRequest(transactionsURI, UnityWebRequest.kHttpVerbPOST);
-
-            byte[] jsonToSend = new System.Text.UTF8Encoding().GetBytes(txnRequestJson);
-            request.uploadHandler = (UploadHandler)new UploadHandlerRaw(jsonToSend);
-            request.downloadHandler = (DownloadHandler)new DownloadHandlerBuffer();
-            request.SetRequestHeader("Content-Type", "application/json");
-
-            request.SendWebRequest();
-            while (!request.isDone)
-            {
-                yield return null;
-            }
-
-            if (request.result == UnityWebRequest.Result.ConnectionError)
-            {
-                responseInfo.status = ResponseInfo.Status.Failed;
-                responseInfo.message = "Error while submitting transaction. " + request.error;
-                callback(null, responseInfo);
-            }
-            else if (request.responseCode == 404)
-            {
-                responseInfo.status = ResponseInfo.Status.Failed;
-                responseInfo.message = "Error. Response 404. " + request.error;
-                callback(null, responseInfo);
-            }
-            else if (request.responseCode >= 400)
-            {
-                responseInfo.status = ResponseInfo.Status.Failed;
-                responseInfo.message = "Error. Response 404. " + request.error;
-                callback(null, responseInfo);
-            }
-            else
-            {
-                string response = request.downloadHandler.text;
-                Transaction createCollectionTxn = JsonConvert.DeserializeObject<Transaction>(response, new TransactionConverter());
-
-                responseInfo.status = ResponseInfo.Status.Success;
-                responseInfo.message = response;
-                callback(createCollectionTxn, responseInfo);
-            }
-
-            request.Dispose();
+            Transaction createCollectionTxn = JsonConvert.DeserializeObject<Transaction>(submitBcsTxnJsonResponse, new TransactionConverter());
+            callback(createCollectionTxn, responseInfo);
             yield return null;
         }
 
@@ -1716,126 +1636,49 @@ namespace Aptos.Unity.Rest
         public IEnumerator CreateToken(Action<Transaction, ResponseInfo> callback
             , Account senderRoyaltyPayeeAddress, string collectionName, string tokenName, string description, int supply, int max, string uri, int royaltyPointsPerMillion)
         {
-            Arguments arguments = new Arguments()
-            {
-                ArgumentStrings = new string[] {
-                    collectionName, tokenName, description, supply.ToString(),
-                    max.ToString(), uri, senderRoyaltyPayeeAddress.AccountAddress.ToString(),
-                    "1000000", royaltyPointsPerMillion.ToString()
-                },
-                MutateSettings = new bool[] { false, false, false, false, false },
-                PropertyKeys = new string[] { },
-                PropertyValues = new int[] { },
-                PropertyTypes = new string[] { },
-            };
+            EntryFunction payload = EntryFunction.Natural(
+                new ModuleId(AccountAddress.FromHex("0x3"), "token"),
+                "create_token_script",
+                new TagSequence(new ISerializableTag[] { }),
+                new BCS.Sequence(
+                    new ISerializable[]
+                    {
+                        new BString(collectionName),
+                        new BString(tokenName),
+                        new BString(description),
+                        new U64((ulong)supply),
+                        new U64((ulong) supply),
+                        new BString(uri),
+                        senderRoyaltyPayeeAddress.AccountAddress,
+                        new U64(1000000),
+                        new U64((ulong)royaltyPointsPerMillion),
+                        new BCS.Sequence(new[] { new Bool(false), new Bool(false), new Bool(false), new Bool(false), new Bool(false) }),
+                        new BCS.Sequence(new BString[] {}),
+                        new BCS.Sequence(new Bytes[] {}),
+                        new BCS.Sequence(new BString[] {})
+                    }
+                )
+            );
 
-            // TODO: Fix - use BCS.TransactionPayload instead of Model.TransactionPayload
-            Model.TransactionPayload txnPayload = new Model.TransactionPayload()
-            {
-                Type = Constants.ENTRY_FUNCTION_PAYLOAD,
-                Function = Constants.CREATE_TOKEN_SCRIPT_FUNCTION,
-                TypeArguments = new string[] { },
-                Arguments = arguments
-            };
+            BCS.TransactionPayload txnPayload = new BCS.TransactionPayload(payload);
 
-            string payloadJson = JsonConvert.SerializeObject(txnPayload, new TransactionPayloadConverter());
+            SignedTransaction signedTransaction = null;
+            Coroutine cor_createBcsSIgnedTransaction = StartCoroutine(CreateBCSSignedTransaction((_signedTransaction) => {
+                signedTransaction = _signedTransaction;
+            }, senderRoyaltyPayeeAddress, new BCS.TransactionPayload(payload)));
+            yield return cor_createBcsSIgnedTransaction;
 
-            string sequenceNumber = "";
+            string submitBcsTxnJsonResponse = "";
             ResponseInfo responseInfo = new ResponseInfo();
 
-            Coroutine cor_sequenceNumber = StartCoroutine(GetAccountSequenceNumber((_sequenceNumber, _responseInfo) => {
-                sequenceNumber = _sequenceNumber;
+            Coroutine cor_submitBcsTransaction = StartCoroutine(SubmitBCSTransaction((_responseJson, _responseInfo) => {
+                submitBcsTxnJsonResponse = _responseJson;
                 responseInfo = _responseInfo;
-            }, senderRoyaltyPayeeAddress.AccountAddress));
-            yield return cor_sequenceNumber;
+            }, signedTransaction));
+            yield return cor_submitBcsTransaction;
 
-            if (responseInfo.status != ResponseInfo.Status.Success)
-            {
-                callback(null, responseInfo);
-                yield break;
-            }
-
-            var expirationTimestamp = (DateTime.Now.ToUnixTimestamp() + Constants.EXPIRATION_TTL).ToString();
-
-            TransactionRequest txnRequest = new TransactionRequest()
-            {
-                Sender = senderRoyaltyPayeeAddress.AccountAddress.ToString(),
-                SequenceNumber = sequenceNumber,
-                MaxGasAmount = Constants.MAX_GAS_AMOUNT.ToString(),
-                GasUnitPrice = Constants.GAS_UNIT_PRICE.ToString(),
-                ExpirationTimestampSecs = expirationTimestamp,
-                Payload = txnPayload
-            };
-
-            string txnRequestJson = JsonConvert.SerializeObject(txnRequest, new TransactionRequestConverter());
-
-            ///////////////////////////////////////////////////////////////////////
-            // 2) Submits that to produce a raw transaction
-            ///////////////////////////////////////////////////////////////////////
-
-            string encodedSubmission = "";
-
-            Coroutine cor_encodedSubmission = StartCoroutine(EncodeSubmission((_encodedSubmission) => {
-                encodedSubmission = _encodedSubmission;
-            }, txnRequestJson));
-            yield return cor_encodedSubmission;
-
-            byte[] toSign = StringToByteArray(encodedSubmission.Trim('"')[2..]);
-            Signature signature = senderRoyaltyPayeeAddress.Sign(toSign);
-
-            txnRequest.Signature = new SignatureData()
-            {
-                Type = Constants.ED25519_SIGNATURE,
-                PublicKey = "0x" + CryptoBytes.ToHexStringLower(senderRoyaltyPayeeAddress.PublicKey),
-                Signature = signature.ToString()
-            };
-
-            string signedTxnRequestJson = JsonConvert.SerializeObject(txnRequest, new TransactionRequestConverter());
-            txnRequestJson = txnRequestJson.Trim();
-
-            string transactionURL = Endpoint + "/transactions";
-            Uri transactionsURI = new Uri(transactionURL);
-            var request = RequestClient.SubmitRequest(transactionsURI, UnityWebRequest.kHttpVerbPOST);
-
-            byte[] jsonToSend = new UTF8Encoding().GetBytes(signedTxnRequestJson);
-            request.uploadHandler = new UploadHandlerRaw(jsonToSend);
-            request.downloadHandler = new DownloadHandlerBuffer();
-            request.SetRequestHeader("Content-Type", "application/json");
-
-            request.SendWebRequest();
-            while (!request.isDone)
-            {
-                yield return null;
-            }
-
-            if (request.result == UnityWebRequest.Result.ConnectionError)
-            {
-                responseInfo.status = ResponseInfo.Status.Failed;
-                responseInfo.message = "Error while submitting transaction. " + request.error;
-                callback(null, responseInfo);
-            }
-            else if (request.responseCode == 404)
-            {
-                responseInfo.status = ResponseInfo.Status.NotFound;
-                responseInfo.message = "Error. Response 404. " + request.error;
-                callback(null, responseInfo);
-            }
-            else if (request.responseCode == 400)
-            {
-                responseInfo.status = ResponseInfo.Status.NotFound;
-                responseInfo.message = "Error. " + request.error + ". " + request.downloadHandler.text;
-                callback(null, responseInfo);
-            }
-            else
-            {
-                string response = request.downloadHandler.text;
-                Transaction createTokenTxn = JsonConvert.DeserializeObject<Transaction>(response, new TransactionConverter());
-                responseInfo.status = ResponseInfo.Status.Success;
-                responseInfo.message = response;
-                callback(createTokenTxn, responseInfo);
-            }
-
-            request.Dispose();
+            Transaction createTokenTxn = JsonConvert.DeserializeObject<Transaction>(submitBcsTxnJsonResponse, new TransactionConverter());
+            callback(createTokenTxn, responseInfo);
             yield return null;
         }
 
@@ -1876,123 +1719,41 @@ namespace Aptos.Unity.Rest
                 yield break;
             }
 
-            Arguments arguments = new Arguments()
-            {
-                ArgumentStrings = new string[] {
-                      receiver.ToString()
-                    , creator.ToString()
-                    , collectionName
-                    , tokenName
-                    , propertyVersion.ToString()
-                    , amount.ToString()
+            EntryFunction payload = EntryFunction.Natural(
+                new ModuleId(AccountAddress.FromHex("0x3"), "token_transfers"),
+                "offer_script",
+                new TagSequence(new ISerializableTag[] { }),
+                new BCS.Sequence(
+                    new ISerializable[]
+                    {
+                        receiver,
+                        creator,
+                        new BString(collectionName),
+                        new BString(tokenName),
+                        new U64((ulong)propertyVersion),
+                        new U64((ulong) amount)
+                    }
+                )
+            );
 
-                }
-            };
+            BCS.TransactionPayload txnPayload = new BCS.TransactionPayload(payload);
 
-            // TODO: Fix - use BCS.TransactionPayload instead of Model.TransactionPayload
-            Model.TransactionPayload txnPayload = new Model.TransactionPayload()
-            {
-                Type = Constants.ENTRY_FUNCTION_PAYLOAD,
-                Function = Constants.TOKEN_TRANSFER_OFFER_SCRIPT,
-                TypeArguments = new string[] { },
-                Arguments = arguments
-            };
+            SignedTransaction signedTransaction = null;
+            Coroutine cor_createBcsSIgnedTransaction = StartCoroutine(CreateBCSSignedTransaction((_signedTransaction) => {
+                signedTransaction = _signedTransaction;
+            }, account, new BCS.TransactionPayload(payload)));
+            yield return cor_createBcsSIgnedTransaction;
 
-            string sequenceNumber = "";
+            string submitBcsTxnJsonResponse = "";
 
-            Coroutine cor_sequenceNumber = StartCoroutine(GetAccountSequenceNumber((_sequenceNumber, _responseInfo) => {
-                sequenceNumber = _sequenceNumber;
+            Coroutine cor_submitBcsTransaction = StartCoroutine(SubmitBCSTransaction((_responseJson, _responseInfo) => {
+                submitBcsTxnJsonResponse = _responseJson;
                 responseInfo = _responseInfo;
-            }, account.AccountAddress));
-            yield return cor_sequenceNumber;
+            }, signedTransaction));
+            yield return cor_submitBcsTransaction;
 
-            if (responseInfo.status != ResponseInfo.Status.Success)
-            {
-                callback(null, responseInfo);
-                yield break;
-            }
-
-            var expirationTimestamp = (DateTime.Now.ToUnixTimestamp() + Constants.EXPIRATION_TTL).ToString();
-
-            TransactionRequest txnRequest = new TransactionRequest()
-            {
-                Sender = account.AccountAddress.ToString(),
-                SequenceNumber = sequenceNumber,
-                MaxGasAmount = Constants.MAX_GAS_AMOUNT.ToString(),
-                GasUnitPrice = Constants.GAS_UNIT_PRICE.ToString(),
-                ExpirationTimestampSecs = expirationTimestamp,
-                Payload = txnPayload
-            };
-
-            string txnRequestJson = JsonConvert.SerializeObject(txnRequest, new TransactionRequestConverter());
-
-            ///////////////////////////////////////////////////////////////////////
-            // 2) Submits that to produce a raw transaction
-            ///////////////////////////////////////////////////////////////////////
-            string encodedSubmission = "";
-
-            Coroutine cor_encodedSubmission = StartCoroutine(EncodeSubmission((_encodedSubmission) => {
-                encodedSubmission = _encodedSubmission;
-            }, txnRequestJson));
-            yield return cor_encodedSubmission;
-
-            byte[] toSign = StringToByteArray(encodedSubmission.Trim('"')[2..]);
-            Signature signature = account.Sign(toSign);
-
-            txnRequest.Signature = new SignatureData()
-            {
-                Type = Constants.ED25519_SIGNATURE,
-                PublicKey = "0x" + CryptoBytes.ToHexStringLower(account.PublicKey),
-                Signature = signature.ToString()
-            };
-
-            string signedTxnRequestJson = JsonConvert.SerializeObject(txnRequest, new TransactionRequestConverter());
-            txnRequestJson = txnRequestJson.Trim();
-
-            string transactionURL = Endpoint + "/transactions";
-            Uri transactionsURI = new Uri(transactionURL);
-            var request = RequestClient.SubmitRequest(transactionsURI, UnityWebRequest.kHttpVerbPOST);
-            
-            byte[] jsonToSend = new UTF8Encoding().GetBytes(signedTxnRequestJson);
-            request.uploadHandler = new UploadHandlerRaw(jsonToSend);
-            request.downloadHandler = new DownloadHandlerBuffer();
-            request.SetRequestHeader("Content-Type", "application/json");
-
-            request.SendWebRequest();
-            while (!request.isDone)
-            {
-                yield return null;
-            }
-
-            if (request.result == UnityWebRequest.Result.ConnectionError)
-            {
-                responseInfo.status = ResponseInfo.Status.Failed;
-                responseInfo.message = "Error while submitting transaction. " + request.error;
-                callback(null, responseInfo);
-            }
-            else if (request.responseCode == 404)
-            {
-                responseInfo.status = ResponseInfo.Status.NotFound;
-                responseInfo.message = "Error. Response 404. " + request.error;
-                callback(null, responseInfo);
-            }
-            else if (request.responseCode == 400)
-            {
-                responseInfo.status = ResponseInfo.Status.NotFound;
-                responseInfo.message = "Error. " + request.error + ". " + request.downloadHandler.text;
-                callback(null, responseInfo);
-            }
-            else
-            {
-                string response = request.downloadHandler.text;
-                Transaction offerTokenTxn = JsonConvert.DeserializeObject<Transaction>(response, new TransactionConverter());
-                responseInfo.status = ResponseInfo.Status.Success;
-                responseInfo.message = response;
-
-                callback(offerTokenTxn, responseInfo);
-            }
-
-            request.Dispose();
+            Transaction offerTokenTxn = JsonConvert.DeserializeObject<Transaction>(submitBcsTxnJsonResponse, new TransactionConverter());
+            callback(offerTokenTxn, responseInfo);
             yield return null;
         }
 
@@ -2010,7 +1771,7 @@ namespace Aptos.Unity.Rest
         /// An object the represents the transaction submitted - null if the transaction to claim a token failed, and a response object that contains the response details.
         /// </returns>
         public IEnumerator ClaimToken(Action<Transaction, ResponseInfo> callback
-            , Account account, Accounts.AccountAddress sender, Accounts.AccountAddress creator
+            , Account account, AccountAddress sender, AccountAddress creator
             , string collectionName, string tokenName, int propertyVersion = 0)
         {
 
@@ -2033,123 +1794,40 @@ namespace Aptos.Unity.Rest
                 yield break;
             }
 
-            Arguments arguments = new Arguments()
-            {
-                ArgumentStrings = new string[] {
-                      sender.ToString()
-                    , creator.ToString()
-                    , collectionName
-                    , tokenName
-                    , propertyVersion.ToString()
-                },
-            };
+            EntryFunction payload = EntryFunction.Natural(
+                new ModuleId(AccountAddress.FromHex("0x3"), "token_transfers"),
+                "claim_script",
+                new TagSequence(new ISerializableTag[] {}),
+                new BCS.Sequence(
+                    new ISerializable[]
+                    {
+                        sender,
+                        creator,
+                        new BString(collectionName),
+                        new BString(tokenName),
+                        new U64((ulong)propertyVersion)
+                    }
+                )
+            );
 
-            // TODO: Fix - use BCS.TransactionPayload instead of Model.TransactionPayload
-            Model.TransactionPayload txnPayload = new Model.TransactionPayload()
-            {
-                Type = Constants.ENTRY_FUNCTION_PAYLOAD,
-                Function = Constants.TOKEN_TRANSFER_CLAIM_SCRIPT,
-                TypeArguments = new string[] { },
-                Arguments = arguments
-            };
+            BCS.TransactionPayload txnPayload = new BCS.TransactionPayload(payload);
 
-            string payloadJson = JsonConvert.SerializeObject(txnPayload, new TransactionPayloadConverter());
+            SignedTransaction signedTransaction = null;
+            Coroutine cor_createBcsSIgnedTransaction = StartCoroutine(CreateBCSSignedTransaction((_signedTransaction) => {
+                signedTransaction = _signedTransaction;
+            }, account, new BCS.TransactionPayload(payload)));
+            yield return cor_createBcsSIgnedTransaction;
 
-            string sequenceNumber = "";
+            string submitBcsTxnJsonResponse = "";
 
-            Coroutine cor_sequenceNumber = StartCoroutine(GetAccountSequenceNumber((_sequenceNumber, _responseInfo) => {
-                sequenceNumber = _sequenceNumber;
+            Coroutine cor_submitBcsTransaction = StartCoroutine(SubmitBCSTransaction((_responseJson, _responseInfo) => {
+                submitBcsTxnJsonResponse = _responseJson;
                 responseInfo = _responseInfo;
-            }, account.AccountAddress));
-            yield return cor_sequenceNumber;
+            }, signedTransaction));
+            yield return cor_submitBcsTransaction;
 
-            if (responseInfo.status != ResponseInfo.Status.Success)
-            {
-                callback(null, responseInfo);
-                yield break;
-            }
-
-            var expirationTimestamp = (DateTime.Now.ToUnixTimestamp() + Constants.EXPIRATION_TTL).ToString();
-
-            TransactionRequest txnRequest = new TransactionRequest()
-            {
-                Sender = account.AccountAddress.ToString(),
-                SequenceNumber = sequenceNumber,
-                MaxGasAmount = Constants.MAX_GAS_AMOUNT.ToString(),
-                GasUnitPrice = Constants.GAS_UNIT_PRICE.ToString(),
-                ExpirationTimestampSecs = expirationTimestamp,
-                Payload = txnPayload
-            };
-
-            string txnRequestJson = JsonConvert.SerializeObject(txnRequest, new TransactionRequestConverter());
-
-            ///////////////////////////////////////////////////////////////////////
-            // 2) Submits that to produce a raw transaction
-            ///////////////////////////////////////////////////////////////////////
-            string encodedSubmission = "";
-
-            Coroutine cor_encodedSubmission = StartCoroutine(EncodeSubmission((_encodedSubmission) => {
-                encodedSubmission = _encodedSubmission;
-            }, txnRequestJson));
-            yield return cor_encodedSubmission;
-
-            byte[] toSign = StringToByteArray(encodedSubmission.Trim('"')[2..]);
-            Signature signature = account.Sign(toSign);
-
-            txnRequest.Signature = new SignatureData()
-            {
-                Type = Constants.ED25519_SIGNATURE,
-                PublicKey = "0x" + CryptoBytes.ToHexStringLower(account.PublicKey),
-                Signature = signature.ToString()
-            };
-
-            string signedTxnRequestJson = JsonConvert.SerializeObject(txnRequest, new TransactionRequestConverter());
-            txnRequestJson = txnRequestJson.Trim();
-
-            string transactionURL = Endpoint + "/transactions";
-            Uri transactionsURI = new Uri(transactionURL);
-            var request = RequestClient.SubmitRequest(transactionsURI, UnityWebRequest.kHttpVerbPOST);
-            
-            byte[] jsonToSend = new UTF8Encoding().GetBytes(signedTxnRequestJson);
-            request.uploadHandler = new UploadHandlerRaw(jsonToSend);
-            request.downloadHandler = new DownloadHandlerBuffer();
-            request.SetRequestHeader("Content-Type", "application/json");
-
-            request.SendWebRequest();
-            while (!request.isDone)
-            {
-                yield return null;
-            }
-
-            if (request.result == UnityWebRequest.Result.ConnectionError)
-            {
-                responseInfo.status = ResponseInfo.Status.Failed;
-                responseInfo.message = "Error while submitting transaction. " + request.error;
-                callback(null, responseInfo);
-            }
-            else if (request.responseCode == 404)
-            {
-                responseInfo.status = ResponseInfo.Status.NotFound;
-                responseInfo.message = "Error. Response 404. " + request.error;
-                callback(null, responseInfo);
-            }
-            else if (request.responseCode == 400)
-            {
-                responseInfo.status = ResponseInfo.Status.NotFound;
-                responseInfo.message = "Error. " + request.error + ". " + request.downloadHandler.text;
-                callback(null, responseInfo);
-            }
-            else
-            {
-                string response = request.downloadHandler.text;
-                responseInfo.status = ResponseInfo.Status.Success;
-                responseInfo.message = response;
-
-                Transaction claimTokenTxn = JsonConvert.DeserializeObject<Transaction>(response, new TransactionConverter());
-                callback(claimTokenTxn, responseInfo);
-            }
-
-            request.Dispose();
+            Transaction claimTokenTxn = JsonConvert.DeserializeObject<Transaction>(submitBcsTxnJsonResponse, new TransactionConverter());
+            callback(claimTokenTxn, responseInfo);
             yield return null;
         }
         #endregion

@@ -19,7 +19,9 @@ namespace Aptos.BCS
         ulong expirationTimestampsSecs;
         int chainId;
 
-        public RawTransaction(AccountAddress sender, int sequenceNumber, TransactionPayload payload, int maxGasAmount, int gasUnitPrice, ulong expirationTimestampsSecs, int chainId)
+        public RawTransaction(AccountAddress sender, int sequenceNumber,
+            TransactionPayload payload, int maxGasAmount, int gasUnitPrice,
+            ulong expirationTimestampsSecs, int chainId)
         {
             this.sender = sender;
             this.sequenceNumber = sequenceNumber;
@@ -452,9 +454,8 @@ namespace Aptos.BCS
                 serializer.SerializeU64(Convert.ToUInt64(this.value.GetValue()));
             else if(this.variant == TypeTag.U128)
                 serializer.SerializeU128((System.Numerics.BigInteger)this.value.GetValue());
-            // TODO: Inquire on C# U256 support
-            //else if(this.variant == TypeTag.U256)
-            //    serializer.Serial
+            else if (this.variant == TypeTag.U256)
+                serializer.SerializeU256((System.Numerics.BigInteger)this.value.GetValue());
             else if(this.variant == TypeTag.ADDRESS)
                 serializer.Serialize((AccountAddress) this.value);
             else if(this.variant == TypeTag.U8_VECTOR)
@@ -470,28 +471,23 @@ namespace Aptos.BCS
             TypeTag variant = (TypeTag) deserializer.DeserializeU8();
             ISerializableTag value;
 
-            if(variant == (int) TypeTag.U8)
+            if (variant == (int)TypeTag.U8)
                 value = new U8(deserializer.DeserializeU8());
-            // TODO: implement U16
-            //else if(variant == (int) TypeTag.U16)
-            //    value = deserializer.DeserializeU16();
-            else if(variant == TypeTag.U32)
+            else if (variant == TypeTag.U16)
+                value = new U16(deserializer.DeserializeU16());
+            else if (variant == TypeTag.U32)
                 value = new U32(deserializer.DeserializeU32());
-            else if(variant == TypeTag.U64)
+            else if (variant == TypeTag.U64)
                 value = new U64(deserializer.DeserializeU64());
-            else if(variant == TypeTag.U128)
+            else if (variant == TypeTag.U128)
                 value = new U128(deserializer.DeserializeU128());
-            // TODO: implement U256
-            //else if(variant == (int) TypeTag.U256)
-            //    value = deserializer.DeserializeU256();
+            else if (variant == TypeTag.U256)
+                value = new U256(deserializer.DeserializeU256());
             else if (variant == TypeTag.ADDRESS)
                 value = AccountAddress.Deserialize(deserializer);
-            // TODO: Implement U8 Vector deserialization
-            //else if(variant == (int) TypeTag.U8_VECTOR)
-            //{
-
-            //}
-            else if(variant == TypeTag.BOOL)
+            else if (variant == TypeTag.U8_VECTOR)
+                throw new NotSupportedException("U8 vectors are currently not supported in the SDK.");
+            else if (variant == TypeTag.BOOL)
                 value = new Bool(deserializer.DeserializeBool());
             else
                 throw new Exception("Invalid variant");
@@ -536,12 +532,13 @@ namespace Aptos.BCS
     /// </summary>
     public class EntryFunction : ISerializable
     {
-        readonly ModuleId module;
-        readonly string function;
-        readonly TagSequence typeArgs;
-        readonly Sequence args;
+        public ModuleId module { get; set; }
+        public string function { get; set; }
+        public TagSequence typeArgs { get; set; }
+        public Sequence args { get; set; }
 
-        public EntryFunction(ModuleId module, string function, TagSequence typeArgs, Sequence args)
+        public EntryFunction(ModuleId module, string function,
+            TagSequence typeArgs, Sequence args)
         {
             this.module = module;
             this.function = function;
@@ -557,7 +554,8 @@ namespace Aptos.BCS
         /// <param name="typeArgs"></param>
         /// <param name="args"></param>
         /// <returns></returns>
-        public static EntryFunction Natural(ModuleId module, string function, TagSequence typeArgs, Sequence args)
+        public static EntryFunction Natural(ModuleId module, string function,
+            TagSequence typeArgs, Sequence args)
         {
             // Encode all args in array of byte arrays
             // See transaction.py `EntryFunction.natural(...)`
@@ -577,7 +575,7 @@ namespace Aptos.BCS
                     byte[] bytes = seqSerializer.GetBytes();
                     valuesAsBytes.Add(new Bytes(bytes)); // Serialized into bytes
                 }
-                else // TODO: Explore this case
+                else
                 {
                     Serialization s = new Serialization();
                     element.Serialize(s);
@@ -694,7 +692,8 @@ namespace Aptos.BCS
 
             ModuleId otherModuleId = (ModuleId)other;
 
-            return this.address.Equals(otherModuleId.address) && this.name.Equals(otherModuleId.name);
+            return this.address.Equals(otherModuleId.address)
+                && this.name.Equals(otherModuleId.name);
         }
 
         public override string ToString()
@@ -749,8 +748,6 @@ namespace Aptos.BCS
 
     /// <summary>
     /// Signed transaction implementation.
-    /// NOTE: TransactionArgument is not implemented in this SDK, instead a Sequence object is used
-    /// TODO: Add comoments regarding TransactionArgument not being implemented
     /// </summary>
     public class SignedTransaction : ISerializable
     {
@@ -777,7 +774,8 @@ namespace Aptos.BCS
             Type elementType = this.authenticator.GetAuthenticator().GetType();
             if (elementType == typeof(MultiAgentAuthenticator))
             {
-                MultiAgentAuthenticator authenticator = (MultiAgentAuthenticator)this.authenticator.GetAuthenticator();
+                MultiAgentAuthenticator authenticator
+                    = (MultiAgentAuthenticator)this.authenticator.GetAuthenticator();
                 
                 MultiAgentRawTransaction transaction = new MultiAgentRawTransaction(
                     this.transaction, authenticator.SecondaryAddresses()

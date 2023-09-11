@@ -4,11 +4,16 @@ using Aptos.Accounts;
 using Aptos.BCS;
 using Aptos.Unity.Rest;
 using Aptos.Unity.Rest.Model;
+using Newtonsoft.Json;
 using UnityEngine;
 using TransactionPayload = Aptos.BCS.TransactionPayload;
 
 namespace Aptos.Unity.Sample
 {
+    /// <summary>
+    /// Example to simulate the transfer of a coins.
+    /// This examples performs a transfer using a BCS encoding transaction.
+    /// </summary>
     public class SimulateTransferCoin : MonoBehaviour
     {
         void Start()
@@ -25,11 +30,8 @@ namespace Aptos.Unity.Sample
             string faucetEndpoint = "https://faucet.devnet.aptoslabs.com";
 
             FaucetClient faucetClient = FaucetClient.Instance;
-
-            RestClient restClient = new RestClient();
-            Coroutine restClientSetupCor = StartCoroutine(RestClient.Instance.SetUp((_restClient) => {
-                restClient = _restClient;
-            }, Constants.DEVNET_BASE_URL));
+            RestClient restClient = RestClient.Instance.SetEndPoint(Constants.DEVNET_BASE_URL);
+            Coroutine restClientSetupCor = StartCoroutine(RestClient.Instance.SetUp());
             yield return restClientSetupCor;
 
             AptosTokenClient tokenClient = AptosTokenClient.Instance.SetUp(restClient);
@@ -109,11 +111,13 @@ namespace Aptos.Unity.Sample
                     rawTxn, alice
                 )
             );
-            yield return null;
+            yield return simulateTxCor;
 
-            // TODO: Check output
-            // assert output[0]["vm_status"] != "Executed successfully", "This shouldn't succeed"
-            // print(json.dumps(output, indent = 4, sort_keys = True))
+            simulateTxnResponse = simulateTxnResponse.Substring(1, simulateTxnResponse.Length - 2); // Remove open and closing bracket, transaction converter only parses the JSON object
+            Transaction transactionResp = JsonConvert.DeserializeObject<Transaction>(simulateTxnResponse, new TransactionConverter());
+            Debug.Log(transactionResp.VmStatus);
+            Debug.Log("<color=cyan>=== This shouldn't succeed: " + !transactionResp.VmStatus.Equals("Executed successfully") + "\nVM Status:   " + transactionResp.VmStatus + " ===</color>");
+            Debug.Log(simulateTxnResponse);
 
             #endregion
 
@@ -150,12 +154,12 @@ namespace Aptos.Unity.Sample
                     rawTxn, alice
                 )
             );
-            yield return null;
+            yield return simulateTxCor;
 
-            // TODO: Check output
-            // assert output[0]["vm_status"] == "Executed successfully", "This should succeed"
-            // print(json.dumps(output, indent = 4, sort_keys = True))
-
+            simulateTxnResponse = simulateTxnResponse.Substring(1, simulateTxnResponse.Length - 2); // Remove open and closing bracket, transaction converter only parses the JSON object
+            transactionResp = JsonConvert.DeserializeObject<Transaction>(simulateTxnResponse, new TransactionConverter());
+            Debug.Log("<color=cyan>=== This should succeed: " + transactionResp.VmStatus.Equals("Executed successfully") + "\nVM Status:   " + transactionResp.VmStatus + " ===</color>");
+            Debug.Log(simulateTxnResponse);
             #endregion
 
             yield return null;

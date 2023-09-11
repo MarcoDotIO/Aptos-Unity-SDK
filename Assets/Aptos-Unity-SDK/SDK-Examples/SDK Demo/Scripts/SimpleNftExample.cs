@@ -1,11 +1,8 @@
 using Aptos.Accounts;
 using Aptos.Unity.Rest;
 using Aptos.Unity.Rest.Model;
-
 using Newtonsoft.Json;
-
 using System.Collections;
-
 using UnityEngine;
 
 namespace Aptos.Unity.Sample
@@ -29,8 +26,12 @@ namespace Aptos.Unity.Sample
             #endregion
 
             #region REST & Faucet Client Setup
-            RestClient.Instance.SetEndPoint(Constants.DEVNET_BASE_URL);
             string faucetEndpoint = "https://faucet.devnet.aptoslabs.com";
+
+            FaucetClient faucetClient = FaucetClient.Instance;
+            RestClient restClient = RestClient.Instance.SetEndPoint(Constants.DEVNET_BASE_URL);
+            Coroutine restClientSetupCor = StartCoroutine(RestClient.Instance.SetUp());
+            yield return restClientSetupCor;
             #endregion
 
             #region Fund Alice Account Through Devnet Faucet
@@ -248,7 +249,7 @@ namespace Aptos.Unity.Sample
             #endregion
 
             #region Transferring the Token to Bob
-            Debug.Log("<color=cyan>=== Get Token Balance for Alice NFT ===</color>");
+            Debug.Log("<color=cyan>=== Alice Offering Token to Bob ===</color>");
             Transaction offerTokenTxn = new Transaction();
             Coroutine offerTokenCor = StartCoroutine(RestClient.Instance.OfferToken((_offerTokenTxn, _responseInfo) =>
             {
