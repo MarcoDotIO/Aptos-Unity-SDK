@@ -47,6 +47,15 @@ namespace Aptos.Accounts
             this.Bitmap = BitConverter.GetBytes(uBitmap);
         }
 
+        public MultiSignature(
+            List<Signature> signatures,
+            byte[] bitmap
+        )
+        {
+            this.Signatures = signatures;
+            this.Bitmap = bitmap;
+        }
+
         /// <summary>
         /// Serialize the concatenated signatures and bitmap of an ED25519 Multi-signature instance to a Data object.
         ///
@@ -66,9 +75,45 @@ namespace Aptos.Accounts
             return concatenatedSignatures.ToArray();
         }
 
+        public List<Signature> GetSignatures()
+        {
+            return this.Signatures;
+        }
+
+        public byte[] GetBitmap()
+        {
+            return this.Bitmap;
+        }
+
         public void Serialize(Serialization serializer)
         {
             serializer.SerializeBytes(this.ToBytes());
+        }
+
+        public static MultiSignature Deserialize(Deserialization deserializer)
+        {
+            byte[] signatureBytes = deserializer.ToBytes();
+            int bitmapOffset = signatureBytes.Length - sizeof(UInt32); // Assuming 4 bytes for UInt32
+            byte[] bitmapData = new byte[sizeof(UInt32)];
+            Array.Copy(signatureBytes, bitmapOffset, bitmapData, 0, sizeof(UInt32));
+            UInt32 bitmap = BitConverter.ToUInt32(bitmapData.Reverse().ToArray(), 0); // Adjusting for big-endian as in Swift code
+
+            List<Signature> signatures = new List<Signature>();
+            int currentByteIndex = 0;
+
+            for (int position = 0; position < 32; position++)
+            {
+                if ((bitmap & (1U << (31 - position))) != 0)
+                {
+                    // Assuming Signature class has a constructor that accepts a byte[] for signature data
+                    byte[] signatureData = new byte[Signature.SignatureLength];
+                    Array.Copy(signatureBytes, currentByteIndex, signatureData, 0, Signature.SignatureLength);
+                    signatures.Add(new Signature(signatureData));
+                    currentByteIndex += Signature.SignatureLength;
+                }
+            }
+
+            return new MultiSignature(signatures, bitmapData); // Assuming a constructor that takes these parameters
         }
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Aptos.BCS;
 
 namespace Aptos.Accounts
@@ -59,6 +60,46 @@ namespace Aptos.Accounts
         public override string ToString()
         {
             return string.Format("{0}-of-{1} Multi-Ed25519 public key", this.Threshold, this.Keys.Count);
+        }
+
+        public bool Verify(byte[] data, MultiSignature signature)
+        {
+            // Step 1: Ensure that the bitmap matches the expected number of signers based on the threshold
+            int signerCount = this.Keys.Count;
+            UInt32 bitmap = BitConverter.ToUInt32(signature.GetBitmap().Reverse().ToArray(), 0);
+
+            int validSignaturesCount = 0;
+
+            for (int index = 0; index < signerCount; index++)
+            {
+                // If the bit at the index's position is set, it indicates the presence of a signature
+                if ((bitmap & (1u << (31 - index))) != 0)
+                {
+                    // Try to verify the signature at this index
+                    var publicKey = this.Keys[index];
+                    var individualSignature = signature.GetSignatures()[validSignaturesCount];
+
+                    if (publicKey.Verify(data, individualSignature))
+                    {
+                        validSignaturesCount++;
+                    }
+                    else
+                    {
+                        // If any signature fails to verify, the entire verification fails
+                        return false;
+                    }
+                }
+            }
+
+            // Check if the number of valid signatures meets or exceeds the threshold
+            if (validSignaturesCount >= this.Threshold)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
         }
 
         /// <summary>

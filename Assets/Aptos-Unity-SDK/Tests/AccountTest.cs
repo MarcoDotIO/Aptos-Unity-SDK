@@ -5,6 +5,8 @@ using Aptos.BCS;
 using Aptos.HdWallet.Utils;
 using System.Collections.Generic;
 using System.Text;
+using UnityEngine;
+using System.ComponentModel;
 
 namespace Aptos.Unity.Test
 {
@@ -461,6 +463,11 @@ namespace Aptos.Unity.Test
                 multisigSignatureBcs,
                 expectedMultisigSignatureBcs,
                 "BCS HEX: " + multisigSignatureBcs + "\n" + multisigBcsBytes.Length);
+
+            Deserialization deserializer = new Deserialization(multisigBcsBytes);
+            MultiSignature multisigSignatureDeserialized = MultiSignature.Deserialize(deserializer);
+            Assert.AreEqual(multisigSignatureDeserialized.GetBitmap(), multiSignature.GetBitmap());
+            Assert.AreEqual(multisigSignatureDeserialized.GetSignatures(), multiSignature.GetSignatures());
         }
 
         [Test]
