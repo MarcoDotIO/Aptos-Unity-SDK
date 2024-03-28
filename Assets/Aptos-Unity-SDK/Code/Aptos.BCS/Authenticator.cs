@@ -1,8 +1,10 @@
 using Aptos.Accounts;
 using Aptos.BCS;
+using Chaos.NaCl;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
 
 namespace Aptos.BCS
 {
@@ -26,6 +28,7 @@ namespace Aptos.BCS
         public const int ED25519 = 0;
         public const int MULTI_ED25519 = 1;
         public const int MULTI_AGENT = 2;
+        public const int FEE_PAYER = 3;
 
         private int Variant;
         private readonly IAuthenticator authenticator;
@@ -42,6 +45,8 @@ namespace Aptos.BCS
                 this.Variant = Authenticator.MULTI_ED25519;
             else if (authenticator.GetType() == typeof(MultiAgentAuthenticator))
                 this.Variant = Authenticator.MULTI_AGENT;
+            else if (authenticator.GetType() == typeof(FeePayerAuthenticator))
+                this.Variant = Authenticator.FEE_PAYER;
             else
                 throw new ArgumentException("Invalid type");
 
@@ -95,6 +100,8 @@ namespace Aptos.BCS
                 authenticator = MultiEd25519Authenticator.Deserialize(deserializer);
             else if (variant == Authenticator.MULTI_AGENT)
                 authenticator = MultiAgentAuthenticator.Deserialize(deserializer);
+            else if (variant == Authenticator.FEE_PAYER)
+                authenticator = FeePayerAuthenticator.Deserialize(deserializer);
             else
                 throw new Exception("Invalid type: " + variant);
 
@@ -343,6 +350,86 @@ namespace Aptos.BCS
         public static MultiEd25519Authenticator Deserialize(Deserialization deserializer)
         {
             throw new NotImplementedException();
+        }
+    }
+
+    public class FeePayerAuthenticator: IAuthenticator, ISerializable
+    {
+        Authenticator Sender;
+
+        List<Tuple<AccountAddress, Authenticator>> SecondarySigners;
+
+        Tuple<AccountAddress, Authenticator> FeePayer;
+
+        public FeePayerAuthenticator(
+            Authenticator sender,
+            List<Tuple<AccountAddress, Authenticator>> secondarySigners,
+            Tuple<AccountAddress, Authenticator> feePayer
+        )
+        {
+            this.Sender = sender;
+            this.SecondarySigners = secondarySigners;
+            this.FeePayer = feePayer;
+        }
+
+        public AccountAddress FeePayerAddress()
+        {
+            return this.FeePayer.Item1;
+        }
+
+        public List<AccountAddress> SecondaryAddresses()
+        {
+            return this.SecondarySigners.Select(signer => { return signer.Item1; }).ToList();
+        }
+
+        public bool Verify(byte[] data)
+        {
+            Debug.Log(this.Sender.GetAuthenticator().GetType());
+            if(!this.Sender.Verify(data))
+            {
+                return false;
+            }
+            Debug.Log("2");
+            if (!this.FeePayer.Item2.Verify(data))
+            {
+                return false;
+            }
+            Debug.Log("3");
+            return this.SecondarySigners.All(signer => { return signer.Item2.Verify(data); });
+        }
+
+        public static FeePayerAuthenticator Deserialize(Deserialization deserializer)
+        {
+            var sender = (Authenticator)Authenticator.Deserialize(deserializer);
+            var secondaryAddresses = deserializer.DeserializeSequence(typeof(AccountAddress)).Cast<AccountAddress>().ToArray();
+            var secondaryAuthenticators = deserializer.DeserializeSequence(typeof(Authenticator)).Cast<Authenticator>().ToArray();
+            var feePayerAddress = AccountAddress.Deserialize(deserializer);
+            var feePayerAuthenticator = (Authenticator)Authenticator.Deserialize(deserializer);
+
+            return new FeePayerAuthenticator(
+                sender,
+                new List<Tuple<AccountAddress, Authenticator>>(secondaryAddresses.Zip(secondaryAuthenticators, (item1, item2) => new Tuple<AccountAddress, Authenticator>(item1, item2))),
+                new Tuple<AccountAddress, Authenticator>(feePayerAddress, feePayerAuthenticator)
+            );
+        }
+
+        public void Serialize(Serialization serializer)
+        {
+            this.Sender.Serialize(serializer);
+            var secondaryAddresses = this.SecondarySigners.Select(signer => { return signer.Item1; });
+            var secondaryAuthenticators = this.SecondarySigners.Select(signer => { return signer.Item2; });
+            serializer.SerializeU32AsUleb128((uint)secondaryAddresses.Count());
+            foreach(var address in secondaryAddresses)
+            {
+                address.Serialize(serializer);
+            }
+            serializer.SerializeU32AsUleb128((uint)secondaryAuthenticators.Count());
+            foreach (var authenticator in secondaryAuthenticators)
+            {
+                authenticator.Serialize(serializer);
+            }
+            this.FeePayer.Item1.Serialize(serializer);
+            this.FeePayer.Item2.Serialize(serializer);
         }
     }
 }

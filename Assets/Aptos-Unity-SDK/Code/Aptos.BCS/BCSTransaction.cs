@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using UnityEngine;
 
 namespace Aptos.BCS
 {
@@ -151,6 +152,69 @@ namespace Aptos.BCS
         }
     }
 
+    public class FeePayerRawTransaction : ISerializable
+    {
+        RawTransaction RawTransaction;
+        List<AccountAddress> SecondarySigners;
+        AccountAddress FeePayer;
+
+        public FeePayerRawTransaction(
+            RawTransaction rawTransaction,
+            List<AccountAddress> secondarySigners,
+            AccountAddress feePayer = null
+        )
+        {
+            this.RawTransaction = rawTransaction;
+            this.SecondarySigners = secondarySigners;
+            if (feePayer == null)
+            {
+                this.FeePayer = AccountAddress.FromHex("0x0");
+            }
+            else
+            {
+                this.FeePayer = feePayer;
+            }
+        }
+
+        public byte[] Keyed()
+        {
+            Serialization ser = new Serialization();
+            this.Serialize(ser);
+
+            byte[] prehash = this.Prehash();
+            byte[] outputBytes = ser.GetBytes();
+
+            byte[] res = new byte[prehash.Length + outputBytes.Length];
+
+            prehash.CopyTo(res, 0);
+            outputBytes.CopyTo(res, prehash.Length);
+
+            return res;
+        }
+
+        public byte[] Prehash()
+        {
+            var hashAlgorithm = new Org.BouncyCastle.Crypto.Digests.Sha3Digest(256);
+            byte[] input = Encoding.UTF8.GetBytes("APTOS::RawTransactionWithData");
+            hashAlgorithm.BlockUpdate(input, 0, input.Length);
+            byte[] result = new byte[32];
+            hashAlgorithm.DoFinal(result, 0);
+            return result;
+        }
+
+        public void Serialize(Serialization serializer)
+        {
+            serializer.SerializeU8(1);
+            this.RawTransaction.Serialize(serializer);
+            serializer.SerializeU32AsUleb128((uint)this.SecondarySigners.Count());
+            foreach (var signer in this.SecondarySigners)
+            {
+                signer.Serialize(serializer);
+            }
+            this.FeePayer.Serialize(serializer);
+        }
+    }
+
     /// <summary>
     /// Representation of a multi agent raw transaction.
     /// </summary>
@@ -211,12 +275,9 @@ namespace Aptos.BCS
 
         public void Serialize(Serialization serializer)
         {
-            throw new NotImplementedException();
-        }
-
-        public ISerializable Deserialize(Deserialization deserializer)
-        {
-            throw new NotImplementedException();
+            serializer.SerializeU8(0);
+            this.rawTransaction.Serialize(serializer);
+            this.secondarySigners.Serialize(serializer);
         }
 
         public object GetValue()
@@ -767,6 +828,11 @@ namespace Aptos.BCS
             return ser.GetBytes();
         }
 
+        public Authenticator GetAuthenticator()
+        {
+            return this.authenticator;
+        }
+
         public bool Verify()
         {
             byte[] keyed;
@@ -779,6 +845,19 @@ namespace Aptos.BCS
                 
                 MultiAgentRawTransaction transaction = new MultiAgentRawTransaction(
                     this.transaction, authenticator.SecondaryAddresses()
+                );
+
+                keyed = transaction.Keyed();
+            }
+            else if (elementType == typeof(FeePayerAuthenticator))
+            {
+                FeePayerAuthenticator authenticator
+                    = (FeePayerAuthenticator)this.authenticator.GetAuthenticator();
+
+                FeePayerRawTransaction transaction = new FeePayerRawTransaction(
+                    this.transaction,
+                    authenticator.SecondaryAddresses(),
+                    authenticator.FeePayerAddress()
                 );
 
                 keyed = transaction.Keyed();
@@ -800,7 +879,7 @@ namespace Aptos.BCS
         public static SignedTransaction Deserialize(Deserialization deserializer)
         {
             RawTransaction transaction = RawTransaction.Deserialize(deserializer);
-            Authenticator authenticator = (Authenticator) Authenticator.Deserialize(deserializer);
+            Authenticator authenticator = (Authenticator)Authenticator.Deserialize(deserializer);
             return new SignedTransaction(transaction, authenticator);
         }
 
