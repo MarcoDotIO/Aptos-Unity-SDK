@@ -111,7 +111,7 @@ namespace Aptos.Accounts
         public byte[] ToBytes()
         {
             List<byte> concatenatedKeys = new List<byte>();
-            foreach (PublicKey key in this.Keys)
+            foreach (ED25519PublicKey key in this.Keys)
                 foreach (byte aByte in key.KeyBytes)
                     concatenatedKeys.Add(aByte);
 
@@ -135,7 +135,7 @@ namespace Aptos.Accounts
             int minThreshold = MIN_THRESHOLD;
 
             // Get number of signers.
-            int nSigners = Key.Length / PublicKey.KeyLength;
+            int nSigners = Key.Length / ED25519PublicKey.KeyLength;
             if(!(minKeys <= nSigners && nSigners <= maxKeys))
                 throw new ArgumentException(string.Format("Must have between {0} and {1} keys.", minKeys, maxKeys));
 
@@ -149,11 +149,11 @@ namespace Aptos.Accounts
             for(int i = 0; i < nSigners; i++) // Loop over all signers.
             {
                 // Extract public key for signle signer.
-                int startByte = i * PublicKey.KeyLength;
-                int endByte = (i + 1) * PublicKey.KeyLength;
+                int startByte = i * ED25519PublicKey.KeyLength;
+                int endByte = (i + 1) * ED25519PublicKey.KeyLength;
 
                 byte[] tempKey = Key[startByte.. endByte];
-                PublicKey publicKey = new PublicKey(tempKey);
+                PublicKey publicKey = new ED25519PublicKey(tempKey);
                 keys.Add(publicKey);
             }
             return new MultiPublicKey(keys, threshold);

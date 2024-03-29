@@ -8,7 +8,7 @@ namespace Aptos.Accounts
     /// <summary>
     /// Represents a 32-byte public key.
     /// </summary>
-    public class PublicKey
+    public class ED25519PublicKey: PublicKey
     {
         /// <summary>
         /// Public key length.
@@ -18,12 +18,7 @@ namespace Aptos.Accounts
         /// <summary>
         /// Hex string representation of public key.
         /// </summary>
-        private string _key;
-
-        /// <summary>
-        /// Byte representation of public key.
-        /// </summary>
-        private byte[] _keyBytes;
+        private byte[] _key;
 
         /// <summary>
         /// The key as a hexadecimal string
@@ -32,15 +27,12 @@ namespace Aptos.Accounts
         {
             get
             {
-                if(_key == null && _keyBytes != null)
-                {
-                    string addressHex = CryptoBytes.ToHexStringLower(_keyBytes);
-                    _key = "0x" + addressHex;
-                }
-                return _key;
+                string addressHex = CryptoBytes.ToHexStringLower(_key);
+                string returnValue = $"0x{addressHex}";
+                return returnValue;
             }
 
-            set => _key = value;
+            set => _key = CryptoBytes.FromHexString(value.StartsWith("0x") ? value.Substring(2) : value);
         }
 
         /// <summary>
@@ -48,25 +40,16 @@ namespace Aptos.Accounts
         /// </summary>
         public byte[] KeyBytes
         {
-            get
-            {
-                if (_keyBytes == null && _key != null)
-                {
-                    string key = _key;
-                    if (_key[0..2].Equals("0x")) { key = _key[2..]; }
-                    _keyBytes = key.ByteArrayFromHexString();
-                }
-                return _keyBytes;
-            }
+            get => _key;
 
-            set => _keyBytes = value;
+            set => _key = value;
         }
 
         /// <summary>
         /// Initializes the PublicKey object with a given byte array.
         /// </summary>
         /// <param name="publicKey">The public key as byte array.</param>
-        public PublicKey(byte[] publicKey)
+        public ED25519PublicKey(byte[] publicKey)
         {
             if (publicKey == null)
                 throw new ArgumentNullException(nameof(publicKey));
@@ -82,7 +65,7 @@ namespace Aptos.Accounts
         /// <param name="key">The public key as a hexadecimal string.   
         /// Example: <c>0x586e3c8d447d7679222e139033e3820235e33da5091e9b0bb8f1a112cf0c8ff5</c>
         /// </param> 
-        public PublicKey(string key)
+        public ED25519PublicKey(string key)
         {
             if (!Utils.IsValidAddress(key))
                 throw new ArgumentException("Invalid key", nameof(key));
@@ -94,7 +77,7 @@ namespace Aptos.Accounts
         /// Initialize the PublicKey object from the given string.
         /// </summary>
         /// <param name="publicKey">The public key as a byte array.</param>
-        public PublicKey(ReadOnlySpan<byte> publicKey)
+        public ED25519PublicKey(ReadOnlySpan<byte> publicKey)
         {
             if (publicKey.Length != KeyLength)
                 throw new ArgumentException("Invalid key length: ", nameof(publicKey));
@@ -108,7 +91,7 @@ namespace Aptos.Accounts
         /// <param name="message">Message that was signed.</param>
         /// <param name="signature">The signature from the message.</param>
         /// <returns></returns>
-        public bool Verify(byte[] message, Signature signature)
+        public override bool Verify(byte[] message, Signature signature)
         {
             return Ed25519.Verify(signature.Data(), message, KeyBytes);
         }
@@ -123,24 +106,24 @@ namespace Aptos.Accounts
         /// Serialize public key
         /// </summary>
         /// <param name="serializer">Serializer object</param>
-        public void Serialize(Serialization serializer)
+        public override void Serialize(Serialization serializer)
         {
             serializer.SerializeBytes(this.KeyBytes);
         }
 
-        public static PublicKey Deserialize(Deserialization deserializer)
+        public static ED25519PublicKey Deserialize(Deserialization deserializer)
         {
             byte[] keyBytes = deserializer.ToBytes();
-            if (keyBytes.Length != PublicKey.KeyLength)
-                throw new Exception("Length mismatch. Expected: " + PublicKey.KeyLength + ", Actual: " + keyBytes.Length);
+            if (keyBytes.Length != KeyLength)
+                throw new Exception("Length mismatch. Expected: " + KeyLength + ", Actual: " + keyBytes.Length);
 
-            return new PublicKey(keyBytes);
+            return new ED25519PublicKey(keyBytes);
         }
 
         /// <inheritdoc cref="object.Equals(object)"/>
         public override bool Equals(object obj)
         {
-            if (obj is PublicKey publicKey)
+            if (obj is ED25519PublicKey publicKey)
  
                 return publicKey.Key.Equals(Key);
 
@@ -165,7 +148,7 @@ namespace Aptos.Accounts
         /// <param name="lhs"></param>
         /// <param name="rhs"></param>
         /// <returns>True if public keys are equal. False is public keys are not equal.</returns>
-        public static bool operator ==(PublicKey lhs, PublicKey rhs)
+        public static bool operator ==(ED25519PublicKey lhs, ED25519PublicKey rhs)
         {
             if (lhs is null)
             {
@@ -183,34 +166,34 @@ namespace Aptos.Accounts
         /// <param name="lhs"></param>
         /// <param name="rhs"></param>
         /// <returns></returns>
-        public static bool operator !=(PublicKey lhs, PublicKey rhs) => lhs == rhs;
+        public static bool operator !=(ED25519PublicKey lhs, ED25519PublicKey rhs) => lhs == rhs;
 
         /// <summary>
         /// Convert a PublicKey object to hex encoded string representatio public key.
         /// </summary>
         /// <param name="publicKey">The PublicKey object.</param>
         /// <returns>Hex encoded string representing the public key.</returns>
-        public static implicit operator string(PublicKey publicKey) => publicKey.Key;
+        public static implicit operator string(ED25519PublicKey publicKey) => publicKey.Key;
 
         /// <summary>
         /// Convert Hex encoded string of a public key to PublicKey object.
         /// </summary>
         /// <param name="publicKey">hex encoded string representing a public key.</param>
         /// <returns>PublicKey object.</returns>
-        public static explicit operator PublicKey(string publicKey) => new PublicKey(publicKey);
+        public static explicit operator ED25519PublicKey(string publicKey) => new ED25519PublicKey(publicKey);
 
         /// <summary>
         /// Convert a PublicKey object to a byte array representation of a public key.
         /// </summary>
         /// <param name="publicKey">The PublicKey object.</param>
         /// <returns>Public key as a byte array.</returns>
-        public static implicit operator byte[](PublicKey publicKey) => publicKey.KeyBytes;
+        public static implicit operator byte[](ED25519PublicKey publicKey) => publicKey._key;
 
         /// <summary>
         /// Convert byte array representation of a public key to a PublicKey object.
         /// </summary>
         /// <param name="keyBytes">The public key as a byte array.</param>
         /// <returns>PublicKey object.</returns>
-        public static explicit operator PublicKey(byte[] keyBytes) => new PublicKey(keyBytes);
+        public static explicit operator ED25519PublicKey(byte[] keyBytes) => new ED25519PublicKey(keyBytes);
     }
 }

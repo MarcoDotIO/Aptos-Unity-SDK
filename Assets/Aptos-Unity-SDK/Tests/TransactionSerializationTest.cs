@@ -972,12 +972,12 @@ namespace Aptos.Unity.Test
             int amountInput = 5000;
 
             // Accounts and crypto
-            PrivateKey senderPrivateKey = PrivateKey.FromHex(senderKeyInput);
-            PublicKey senderPublicKey = senderPrivateKey.PublicKey();
+            ED25519PrivateKey senderPrivateKey = ED25519PrivateKey.FromHex(senderKeyInput);
+            ED25519PublicKey senderPublicKey = (ED25519PublicKey)senderPrivateKey.PublicKey();
             AccountAddress senderAccountAddress = AccountAddress.FromKey(senderPublicKey);
 
-            PrivateKey receiverPrivateKey = PrivateKey.FromHex(receiverKeyInput);
-            PublicKey receiverPublicKey = receiverPrivateKey.PublicKey();
+            ED25519PrivateKey receiverPrivateKey = ED25519PrivateKey.FromHex(receiverKeyInput);
+            ED25519PublicKey receiverPublicKey = (ED25519PublicKey)receiverPrivateKey.PublicKey();
             AccountAddress receiverAccountAddress = AccountAddress.FromKey(receiverPublicKey);
 
             // Transaction arguments
@@ -1162,12 +1162,12 @@ namespace Aptos.Unity.Test
             int chainIdInput = 4;
 
             // Accounts and crypto
-            PrivateKey senderPrivateKey = PrivateKey.FromHex(senderKeyInput);
-            PublicKey senderPublicKey = senderPrivateKey.PublicKey();
+            ED25519PrivateKey senderPrivateKey = ED25519PrivateKey.FromHex(senderKeyInput);
+            ED25519PublicKey senderPublicKey = (ED25519PublicKey)senderPrivateKey.PublicKey();
             AccountAddress senderAccountAddress = AccountAddress.FromKey(senderPublicKey);
 
-            PrivateKey receiverPrivateKey = PrivateKey.FromHex(receiverKeyInput);
-            PublicKey receiverPublicKey = receiverPrivateKey.PublicKey();
+            ED25519PrivateKey receiverPrivateKey = ED25519PrivateKey.FromHex(receiverKeyInput);
+            ED25519PublicKey receiverPublicKey = (ED25519PublicKey)receiverPrivateKey.PublicKey();
             AccountAddress receiverAccountAddress = AccountAddress.FromKey(receiverPublicKey);
 
             // Transaction arguments

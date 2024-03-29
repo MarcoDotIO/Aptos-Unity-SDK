@@ -28,12 +28,12 @@ namespace Aptos.Accounts
         /// <param name="SignatureMap">The tuple list containing the public keys associated with their signatures.</param>
         public MultiSignature(
             MultiPublicKey PublicKeyMulti,
-            List<Tuple<PublicKey, Signature>> SignatureMap
+            List<Tuple<ED25519PublicKey, Signature>> SignatureMap
         )
         {
             this.Signatures = new List<Signature>();
             int bitmap = 0;
-            foreach(Tuple<PublicKey, Signature> entry in SignatureMap)
+            foreach(Tuple<ED25519PublicKey, Signature> entry in SignatureMap)
             {
                 this.Signatures.Add(entry.Item2);
                 int index = PublicKeyMulti.Keys.IndexOf(entry.Item1);

@@ -15,12 +15,12 @@ namespace Aptos.Accounts
         /// <summary>
         /// Private key representation.
         /// </summary>
-        public PrivateKey PrivateKey { get; set; }
+        public ED25519PrivateKey PrivateKey { get; set; }
 
         /// <summary>
         /// Public key representation.
         /// </summary>
-        public PublicKey PublicKey { get; set; }
+        public ED25519PublicKey PublicKey { get; set; }
 
         /// <summary>
         /// Account address representation.
@@ -40,8 +40,8 @@ namespace Aptos.Accounts
             byte[] seed = new byte[Ed25519.PrivateKeySeedSizeInBytes];
             RandomUtils.GetBytes(seed);
 
-            PrivateKey = new PrivateKey(seed);
-            PublicKey = new PublicKey(Ed25519.PublicKeyFromSeed(seed));
+            PrivateKey = new ED25519PrivateKey(seed);
+            PublicKey = new ED25519PublicKey(Ed25519.PublicKeyFromSeed(seed));
             AccountAddress = AccountAddress.FromKey(PublicKey);
             PrivateKeyShort = new byte[32];
             Array.Copy(seed, 0, PrivateKeyShort, 0, 32);
@@ -54,16 +54,16 @@ namespace Aptos.Accounts
         /// <param name="publicKey">The public key.</param>
         public Account(string privateKey, string publicKey)
         {
-            PrivateKey = new PrivateKey(privateKey);
-            PublicKey = new PublicKey(publicKey);
+            PrivateKey = new ED25519PrivateKey(privateKey);
+            PublicKey = new ED25519PublicKey(publicKey);
             AccountAddress = AccountAddress.FromKey(PublicKey);
         }
 
         /// <inheritdoc cref="Account(string, string)"/>
         public Account(byte[] privateKey, byte[] publicKey)
         {
-            PrivateKey = new PrivateKey(privateKey);
-            PublicKey = new PublicKey(publicKey);
+            PrivateKey = new ED25519PrivateKey(privateKey);
+            PublicKey = new ED25519PublicKey(publicKey);
             AccountAddress = AccountAddress.FromKey(PublicKey);
         }
 
@@ -81,8 +81,8 @@ namespace Aptos.Accounts
         /// <returns>A new account.</returns>
         public static Account LoadKey(string privateKeyHex)
         {
-            PrivateKey privateKey = new PrivateKey(privateKeyHex);
-            PublicKey publicKey = privateKey.PublicKey();
+            ED25519PrivateKey privateKey = new ED25519PrivateKey(privateKeyHex);
+            ED25519PublicKey publicKey = (ED25519PublicKey)privateKey.PublicKey();
             return new Account(privateKey, publicKey);
         }
 

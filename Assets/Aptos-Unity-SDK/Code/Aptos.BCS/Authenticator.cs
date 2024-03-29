@@ -135,7 +135,7 @@ namespace Aptos.BCS
         /// <summary>
         /// The authenticators public key.
         /// </summary>
-        private readonly PublicKey publicKey;
+        private readonly ED25519PublicKey publicKey;
 
         /// <summary>
         /// The authenticator's public key.
@@ -147,7 +147,7 @@ namespace Aptos.BCS
         /// </summary>
         /// <param name="publicKey"></param>
         /// <param name="signature"></param>
-        public Ed25519Authenticator(PublicKey publicKey, Signature signature)
+        public Ed25519Authenticator(ED25519PublicKey publicKey, Signature signature)
         {
             this.publicKey = publicKey;
             this.signature = signature;
@@ -173,7 +173,7 @@ namespace Aptos.BCS
         /// <inheritdoc/>
         public static Ed25519Authenticator Deserialize(Deserialization deserializer)
         {
-            PublicKey key = PublicKey.Deserialize(deserializer);
+            ED25519PublicKey key = ED25519PublicKey.Deserialize(deserializer);
             Signature signature = Signature.Deserialize(deserializer);
 
             return new Ed25519Authenticator(key, signature);

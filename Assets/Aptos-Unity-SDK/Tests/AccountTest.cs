@@ -112,7 +112,7 @@ namespace Aptos.Unity.Test
         [Test]
         public void GeneratePrivateKeysWithBytesSuccess()
         {
-            PrivateKey privateKey = new PrivateKey(PrivateKeyBytes);
+            ED25519PrivateKey privateKey = new ED25519PrivateKey(PrivateKeyBytes);
             Assert.IsNotNull(privateKey.KeyBytes, "PrivateKey.KeyBytes != null");
             Assert.AreEqual(32, privateKey.KeyBytes.Length);
             Assert.AreEqual(privateKey.KeyBytes, PrivateKeyBytes);
@@ -124,8 +124,8 @@ namespace Aptos.Unity.Test
         [Test]
         public void GenerateKeysWithBytesSuccess()
         {
-            PrivateKey privateKey = new PrivateKey(PrivateKeyBytes);
-            PublicKey publicKey = new PublicKey(PublicKeyBytes);
+            ED25519PrivateKey privateKey = new ED25519PrivateKey(PrivateKeyBytes);
+            ED25519PublicKey publicKey = new ED25519PublicKey(PublicKeyBytes);
 
             Assert.IsNotNull(privateKey.KeyBytes, "PrivateKey.KeyBytes != null");
             Assert.IsNotNull(publicKey.KeyBytes, "PublicKey.KeyBytes != null");
@@ -140,8 +140,8 @@ namespace Aptos.Unity.Test
         [Test]
         public void GenerateKeysWithStringSuccess()
         {
-            PrivateKey privateKey = new PrivateKey(PrivateKeyHex);
-            PublicKey publicKey = new PublicKey(PublicKeyHex);
+            ED25519PrivateKey privateKey = new ED25519PrivateKey(PrivateKeyHex);
+            ED25519PublicKey publicKey = new ED25519PublicKey(PublicKeyHex);
 
             Assert.IsNotNull(privateKey.KeyBytes, "PrivateKey.KeyBytes != null");
             Assert.IsNotNull(publicKey.KeyBytes, "PublicKey.KeyBytes != null");
@@ -159,8 +159,8 @@ namespace Aptos.Unity.Test
         [Test]
         public void GeneratePublicKeyFromPrivateKeySuccess()
         {
-            PrivateKey privateKey = new PrivateKey(PrivateKeyHex);
-            PublicKey publicKey = privateKey.PublicKey();
+            ED25519PrivateKey privateKey = new ED25519PrivateKey(PrivateKeyHex);
+            ED25519PublicKey publicKey = (ED25519PublicKey)privateKey.PublicKey();
 
             Assert.AreEqual(PublicKeyBytes, publicKey.KeyBytes);
         }
@@ -168,7 +168,7 @@ namespace Aptos.Unity.Test
         [Test]
         public void PrivateKeyFromHexSignSuccess()
         {
-            PrivateKey privateKey = new PrivateKey(PrivateKeyHex);
+            ED25519PrivateKey privateKey = new ED25519PrivateKey(PrivateKeyHex);
             Assert.AreEqual(privateKey.Key, PrivateKeyHex);
             Assert.AreEqual(privateKey.KeyBytes, PrivateKeyBytes);
 
@@ -179,7 +179,7 @@ namespace Aptos.Unity.Test
         [Test]
         public void PrivateKeyFromBytesSignSuccess()
         {
-            PrivateKey privateKey = new PrivateKey(PrivateKeyBytes);
+            ED25519PrivateKey privateKey = new ED25519PrivateKey(PrivateKeyBytes);
             Assert.AreEqual(privateKey.Key, PrivateKeyHex);
             Assert.AreEqual(privateKey.KeyBytes, PrivateKeyBytes);
 
@@ -192,8 +192,8 @@ namespace Aptos.Unity.Test
         {
             Assert.Throws<ArgumentException>(delegate ()
             {
-                PrivateKey privateKey = new PrivateKey(PrivateKeyBytesInvalid);
-                PublicKey publicKey = new PublicKey(PublicKeyBytesInvalid);
+                ED25519PrivateKey privateKey = new ED25519PrivateKey(PrivateKeyBytesInvalid);
+                ED25519PublicKey publicKey = new ED25519PublicKey(PublicKeyBytesInvalid);
             });
         }
 
@@ -201,7 +201,7 @@ namespace Aptos.Unity.Test
         public void PublicKeySerialization()
         {
             Serialization serializer = new Serialization();
-            PublicKey publicKey = new PublicKey(PublicKeyBytes);
+            ED25519PublicKey publicKey = new ED25519PublicKey(PublicKeyBytes);
             publicKey.Serialize(serializer);
             byte[] output = serializer.GetBytes();
 
@@ -212,14 +212,14 @@ namespace Aptos.Unity.Test
         public void PublicKeyDeserialization()
         {
             Serialization serializer = new Serialization();
-            PublicKey publicKey = new PublicKey(PublicKeyBytes);
+            ED25519PublicKey publicKey = new ED25519PublicKey(PublicKeyBytes);
             publicKey.Serialize(serializer);
             byte[] output = serializer.GetBytes();
 
             Assert.AreEqual(output, PublicKeySerializedOutput);
 
             Deserialization deserializer = new Deserialization(output);
-            PublicKey actualDeserialized = PublicKey.Deserialize(deserializer);
+            ED25519PublicKey actualDeserialized = ED25519PublicKey.Deserialize(deserializer);
 
             Assert.AreEqual(publicKey, actualDeserialized);
         }
@@ -228,7 +228,7 @@ namespace Aptos.Unity.Test
         public void PrivateKeySerialization()
         {
             Serialization serializer = new Serialization();
-            PrivateKey privateKey = new PrivateKey(PrivateKeyBytes);
+            ED25519PrivateKey privateKey = new ED25519PrivateKey(PrivateKeyBytes);
             privateKey.Serialize(serializer);
             byte[] output = serializer.GetBytes();
 
@@ -269,7 +269,7 @@ namespace Aptos.Unity.Test
         [Test]
         public void GenerateAccountAddressFromPublicKey()
         {
-            PublicKey publicKey = new PublicKey(PublicKeyBytes);
+            ED25519PublicKey publicKey = new ED25519PublicKey(PublicKeyBytes);
             Accounts.AccountAddress accountAddress = Accounts.AccountAddress.FromKey(publicKey);
             Assert.AreEqual(accountAddress.ToString(), AccountAddressHex);
         }
@@ -278,11 +278,11 @@ namespace Aptos.Unity.Test
         public void CreateAccountFromKeys()
         {
             Account acc = new Account(PrivateKeyBytes, PublicKeyBytes);
-            PrivateKey privateKey = acc.PrivateKey;
-            PublicKey publicKey = acc.PublicKey;
+            ED25519PrivateKey privateKey = acc.PrivateKey;
+            ED25519PublicKey publicKey = acc.PublicKey;
 
-            PublicKey validPublicKey = new PublicKey(PublicKeyBytes);
-            PrivateKey validPrivateKey = new PrivateKey(PrivateKeyBytes);
+            ED25519PublicKey validPublicKey = new ED25519PublicKey(PublicKeyBytes);
+            ED25519PrivateKey validPrivateKey = new ED25519PrivateKey(PrivateKeyBytes);
 
             Assert.IsTrue(privateKey.Key == validPrivateKey.Key);
             Assert.IsTrue(publicKey.Key == validPublicKey.Key);
@@ -292,11 +292,11 @@ namespace Aptos.Unity.Test
         public void GenerateAccountFromPrivateKeyStringSuccess()
         {
             Account acc = Account.LoadKey(PrivateKeyHex);
-            PrivateKey privateKey = acc.PrivateKey;
-            PublicKey publicKey = acc.PublicKey;
+            ED25519PrivateKey privateKey = acc.PrivateKey;
+            ED25519PublicKey publicKey = acc.PublicKey;
 
-            PublicKey expectedPublicKey = new PublicKey(PublicKeyBytes);
-            PrivateKey expectedPrivateKey = new PrivateKey(PrivateKeyBytes);
+            ED25519PublicKey expectedPublicKey = new ED25519PublicKey(PublicKeyBytes);
+            ED25519PrivateKey expectedPrivateKey = new ED25519PrivateKey(PrivateKeyBytes);
 
             Assert.IsTrue(privateKey.Key == expectedPrivateKey.Key);
             Assert.IsTrue(publicKey.Key == expectedPublicKey.Key);
@@ -385,10 +385,10 @@ namespace Aptos.Unity.Test
         public void TestMultisig()
         {
             // Generate signatory private keys.
-            PrivateKey privateKey1 = PrivateKey.FromHex(
+            PrivateKey privateKey1 = ED25519PrivateKey.FromHex(
                 "4e5e3be60f4bbd5e98d086d932f3ce779ff4b58da99bf9e5241ae1212a29e5fe"
             );
-            PrivateKey privateKey2 = PrivateKey.FromHex(
+            PrivateKey privateKey2 = ED25519PrivateKey.FromHex(
                 "1e70e49b78f976644e2c51754a2f049d3ff041869c669523ba95b172c7329901"
             );
 
@@ -413,9 +413,9 @@ namespace Aptos.Unity.Test
             Assert.AreEqual(expectedPublicKeyBcs, publicKeyBcs,
                 publicKeyBcs
                 + "\n" +
-                privateKey1.PublicKey().KeyBytes.HexString()
+                ((ED25519PublicKey)privateKey1.PublicKey()).KeyBytes.HexString()
                 + "\n" +
-                privateKey2.PublicKey().KeyBytes.HexString()
+                ((ED25519PublicKey)privateKey1.PublicKey()).KeyBytes.HexString()
                 + "\n" +
                 multiSigPublicKey.Threshold
                 + "\n" +
@@ -440,9 +440,9 @@ namespace Aptos.Unity.Test
             Signature signature = privateKey2.Sign(Encoding.UTF8.GetBytes("multisig"));
 
             // Compose multisig signature.
-            List<Tuple<PublicKey, Signature>> signMap = new List<Tuple<PublicKey, Signature>>()
+            List<Tuple<ED25519PublicKey, Signature>> signMap = new List<Tuple<ED25519PublicKey, Signature>>()
             {
-                Tuple.Create<PublicKey, Signature>(privateKey2.PublicKey(), signature)
+                Tuple.Create((ED25519PublicKey)privateKey2.PublicKey(), signature)
             };
             MultiSignature multiSignature = new MultiSignature(multisigPublicKey, signMap);
 
@@ -473,11 +473,11 @@ namespace Aptos.Unity.Test
         [Test]
         public void TestMultiEd25519()
         {
-            PrivateKey privateKey1 = PrivateKey.FromHex(
+            PrivateKey privateKey1 = ED25519PrivateKey.FromHex(
                 "4e5e3be60f4bbd5e98d086d932f3ce779ff4b58da99bf9e5241ae1212a29e5fe"
             );
 
-            PrivateKey privateKey2 = PrivateKey.FromHex(
+            PrivateKey privateKey2 = ED25519PrivateKey.FromHex(
                 "1e70e49b78f976644e2c51754a2f049d3ff041869c669523ba95b172c7329901"
             );
 

@@ -6,13 +6,33 @@ using NBitcoin;
 
 namespace Aptos.Accounts
 {
+    public abstract class PrivateKey: ISerializable
+    {
+        private byte[] _key;
+
+        public abstract Signature Sign(byte[] message);
+
+        public abstract PublicKey PublicKey();
+
+        public abstract void Serialize(Serialization serializer);
+    }
+
+    public abstract class PublicKey: ISerializable
+    {
+        private byte[] _key;
+
+        public abstract bool Verify(byte[] message, Signature signature);
+
+        public abstract void Serialize(Serialization serializer);
+    }
+
     /// <summary>
     /// Represents a 64-byte extended private key.
     /// An extended private key is a requirement from Choas.NaCl.
     /// 
     /// Note that the hexadecimal string representation is of the 32-byte private key on it's own.
     /// </summary>
-    public class PrivateKey
+    public class ED25519PrivateKey: PrivateKey
     {
         /// <summary>
         /// Extended private key length.
@@ -27,7 +47,7 @@ namespace Aptos.Accounts
         /// <summary>
         /// Hex string representation of private key.
         /// </summary>
-        private string _key;
+        private byte[] _key;
 
         /// <summary>
         /// The 64-byte extended private key.
@@ -37,28 +57,18 @@ namespace Aptos.Accounts
         private byte[] _extendedKeyBytes;
 
         /// <summary>
-        /// The 32-byte private key
-        /// This key is exposed publicly by <see cref="KeyBytes">KeyBytes</see>
-        /// </summary>
-        private byte[] _keyBytes;
-
-        /// <summary>
-        /// The key as a 32-byte hexadecimal string (64 characters).   
+        /// The key as a hexadecimal string
         /// </summary>
         public string Key
         {
             get
             {
-                if (_key == null && _keyBytes != null)
-                {
-                    string addressHex = CryptoBytes.ToHexStringLower(_keyBytes);
-                    _key = "0x" + addressHex;
-                }
-
-                return _key;
+                string addressHex = CryptoBytes.ToHexStringLower(_key);
+                string returnValue = $"0x{addressHex}";
+                return returnValue;
             }
 
-            set => _key = value;
+            set => _key = CryptoBytes.FromHexString(value.StartsWith("0x") ? value.Substring(2) : value);
         }
 
         /// <summary>
@@ -71,16 +81,11 @@ namespace Aptos.Accounts
             get
             {
                 // if the private key bytes have not being initialized, but a 32-byte (64 character) string private has been set
-                if (_keyBytes == null && _extendedKeyBytes == null && _key != null)
+                if (_extendedKeyBytes == null && _key != null)
                 {
-                    string key = _key;
-                    if (_key[0..2].Equals("0x")) { key = _key[2..]; } // Trim the private key hex string
-
-                    byte[] seed = key.ByteArrayFromHexString(); // Turn private key hex string into byte to be used a seed to derive the extended key
-                    _keyBytes = seed;
-                    _extendedKeyBytes = Ed25519.ExpandedPrivateKeyFromSeed(seed);
+                    _extendedKeyBytes = Ed25519.ExpandedPrivateKeyFromSeed(_key);
                 }
-                return _keyBytes;
+                return _key;
             }
 
             set
@@ -88,7 +93,7 @@ namespace Aptos.Accounts
                 if(value.Length != KeyLength)
                     throw new ArgumentException("Invalid key length: ", nameof(value));
 
-                _keyBytes = value;
+                _key = value;
                 _extendedKeyBytes = Ed25519.ExpandedPrivateKeyFromSeed(value);
             }
         }
@@ -100,7 +105,7 @@ namespace Aptos.Accounts
         /// Note: To create a private key from a 32-byte string see <see cref="PrivateKey(string key)">PrivateKey(string key)</see>
         /// </summary>
         /// <param name="privateKey">64-byte array representation of the private key.</param>
-        public PrivateKey(byte[] privateKey)
+        public ED25519PrivateKey(byte[] privateKey)
         {
             if (privateKey == null)
                 throw new ArgumentNullException(nameof(privateKey));
@@ -120,7 +125,7 @@ namespace Aptos.Accounts
         /// </summary>
         /// <param name="key">The private key as an ASCII encoded string.   
         /// Example: <c>0x64f57603b58af16907c18a866123286e1cbce89790613558dc1775abb3fc5c8c</c></param>
-        public PrivateKey(string key)
+        public ED25519PrivateKey(string key)
         {
             if(!HdWallet.Utils.Utils.IsValidAddress(key))
                 throw new ArgumentException("Invalid key", nameof(key));
@@ -134,16 +139,16 @@ namespace Aptos.Accounts
         /// </summary>
         /// <param name="key">The private key as an ASCII encoded string.</param>
         /// <returns>Private key object.</returns>
-        public static PrivateKey FromHex(string key)
+        public static ED25519PrivateKey FromHex(string key)
         {
-            return new PrivateKey(key);
+            return new ED25519PrivateKey(key);
         }
 
         /// <summary>
         /// Initialize the PrivateKey object from the given string.
         /// </summary>
         /// <param name="key">The private key as a hex encoded byte array.</param>
-        public PrivateKey(ReadOnlySpan<byte> privateKey)
+        public ED25519PrivateKey(ReadOnlySpan<byte> privateKey)
         {
             if (privateKey.Length != KeyLength)
                 throw new ArgumentException("Invalid key length: ", nameof(privateKey));
@@ -157,9 +162,9 @@ namespace Aptos.Accounts
         /// Derives public key from the private key bytes.
         /// </summary>
         /// <returns>PublicKey object.</returns>
-        public PublicKey PublicKey()
+        public override PublicKey PublicKey()
         {
-            PublicKey publicKey = new PublicKey(Ed25519.PublicKeyFromSeed(KeyBytes));
+            ED25519PublicKey publicKey = new ED25519PublicKey(Ed25519.PublicKeyFromSeed(KeyBytes));
             return publicKey;
         }
 
@@ -167,7 +172,7 @@ namespace Aptos.Accounts
         {
             byte[] seed = new byte[Ed25519.PrivateKeySeedSizeInBytes];
             RandomUtils.GetBytes(seed);
-            return new PrivateKey(seed);
+            return new ED25519PrivateKey(seed);
         }
 
         /// <summary>
@@ -176,7 +181,7 @@ namespace Aptos.Accounts
         /// <param name="lhs">First private key in comparison..</param>
         /// <param name="rhs">Second private key in comparison.</param>
         /// <returns></returns>
-        public static bool operator ==(PrivateKey lhs, PrivateKey rhs)
+        public static bool operator ==(ED25519PrivateKey lhs, ED25519PrivateKey rhs)
         {
 
             if (lhs is null)
@@ -191,14 +196,14 @@ namespace Aptos.Accounts
             return lhs.Equals(rhs);
         }
 
-        public static bool operator !=(PrivateKey lhs, PrivateKey rhs) => !(lhs == rhs);
+        public static bool operator !=(ED25519PrivateKey lhs, ED25519PrivateKey rhs) => !(lhs == rhs);
 
         /// <summary>
         /// Sign a message using the extended private key.
         /// </summary>
         /// <param name="message">The message to sign, represented in bytes.</param>
         /// <returns>The signature generated for the message as an object</returns>
-        public Signature Sign(byte[] message)
+        public override Signature Sign(byte[] message)
         {
             ArraySegment<byte> signature = new ArraySegment<byte>(new byte[64]);
             Ed25519.Sign(signature,
@@ -211,7 +216,7 @@ namespace Aptos.Accounts
         /// Serialize private key
         /// </summary>
         /// <param name="serializer">Serializer object</param>
-        public void Serialize(Serialization serializer)
+        public override void Serialize(Serialization serializer)
         {
             serializer.SerializeBytes(this.KeyBytes);
         }
@@ -219,7 +224,7 @@ namespace Aptos.Accounts
         /// <inheritdoc cref="Equals(object)"/>
         public override bool Equals(object obj)
         {
-            if(obj is PrivateKey privateKey)
+            if(obj is ED25519PrivateKey privateKey)
                 return privateKey.Key == this.Key;
 
             return false;
@@ -236,6 +241,6 @@ namespace Aptos.Accounts
         /// </summary>
         /// <param name="privateKey">The PrivateKey object.</param>
         /// <returns>Hexadecimal string representing the private key.</returns>
-        public static implicit operator string(PrivateKey privateKey) => privateKey.Key;
+        public static implicit operator string(ED25519PrivateKey privateKey) => privateKey.Key;
     }
 }

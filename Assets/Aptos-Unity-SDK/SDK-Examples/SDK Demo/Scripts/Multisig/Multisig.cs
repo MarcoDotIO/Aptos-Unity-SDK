@@ -271,7 +271,7 @@ namespace Aptos.Unity.Sample
             #endregion
 
             #region Section 5: Submit transfer transaction
-            List<Tuple<PublicKey, Signature>> SignatureMap = new List<Tuple<PublicKey, Signature>>()
+            List<Tuple<ED25519PublicKey, Signature>> SignatureMap = new List<Tuple<ED25519PublicKey, Signature>>()
             {
                 Tuple.Create(alice.PublicKey, aliceSignature),
                 Tuple.Create(bob.PublicKey, bobSignature)
@@ -473,7 +473,7 @@ namespace Aptos.Unity.Sample
 
             byte[] capUpdateTable = new MultiSignature(
                 multisigPublicKey,
-                new List<Tuple<PublicKey, Signature>>()
+                new List<Tuple<ED25519PublicKey, Signature>>()
                 {
                     Tuple.Create(bob.PublicKey, bob.Sign(rotationProofChallangeBcs)),
                     Tuple.Create(chad.PublicKey, chad.Sign(rotationProofChallangeBcs))
