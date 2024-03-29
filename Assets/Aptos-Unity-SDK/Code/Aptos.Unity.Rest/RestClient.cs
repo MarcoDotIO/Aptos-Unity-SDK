@@ -757,6 +757,59 @@ namespace Aptos.Unity.Rest
         #endregion
 
         #region Transactions
+        public IEnumerator SimulateBcsTransaction(
+            Action<string, ResponseInfo> callback,
+            SignedTransaction signedTransaction,
+            bool estimateGasUsage = false
+        )
+        {
+            string simulateTxnEndpoint = $"{Endpoint}";
+            if (estimateGasUsage)
+            {
+                simulateTxnEndpoint += "/transactions/simulate?estimate_gas_unit_price=true&estimate_max_gas_amount=true";
+            }
+            else
+            {
+                simulateTxnEndpoint += "/transactions/simulate";
+            }
+            UnityWebRequest request = new UnityWebRequest(simulateTxnEndpoint, "POST");
+            request.SetRequestHeader("Content-Type", "application/x.aptos.signed_transaction+bcs");
+
+            request.uploadHandler = new UploadHandlerRaw(signedTransaction.Bytes());
+            request.downloadHandler = new DownloadHandlerBuffer();
+
+            request.SendWebRequest();
+            while (!request.isDone)
+            {
+                yield return null;
+            }
+
+            ResponseInfo responseInfo = new ResponseInfo();
+            if (request.result == UnityWebRequest.Result.ConnectionError)
+            {
+                responseInfo.status = ResponseInfo.Status.Failed;
+                responseInfo.message = "Error while submitting simulated transaction. " + request.error;
+                callback(null, responseInfo);
+            }
+            if (request.responseCode == 404)
+            {
+                responseInfo.status = ResponseInfo.Status.NotFound;
+                responseInfo.message = "Endppoint not found. " + request.error;
+                callback(null, responseInfo);
+            }
+            else
+            {
+                string response = request.downloadHandler.text;
+
+                responseInfo.status = ResponseInfo.Status.Success;
+                responseInfo.message = response;
+                callback(response, responseInfo);
+            }
+
+            request.Dispose();
+            yield return null;
+        }
+
         public IEnumerator SimulateTransaction(
             Action<string, ResponseInfo> callback,
             RawTransaction transaction,
